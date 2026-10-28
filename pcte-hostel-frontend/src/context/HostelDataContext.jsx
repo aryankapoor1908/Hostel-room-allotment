@@ -302,6 +302,77 @@ export function HostelDataProvider({ children }) {
     }
   }, [data]);
 
+  useEffect(() => {
+    async function fetchBackendData() {
+      try {
+        const [
+          hostelsRes,
+          roomsRes,
+          studentsRes,
+          outpassesRes,
+          complaintsRes,
+          noticesRes,
+          messMenuRes,
+          marketplaceRes,
+          inventoryRes,
+          requestsRes,
+          receiptsRes,
+        ] = await Promise.allSettled([
+          fetch("/api/hostels").then((r) => r.json()),
+          fetch("/api/rooms").then((r) => r.json()),
+          fetch("/api/students").then((r) => r.json()),
+          fetch("/api/outpasses").then((r) => r.json()),
+          fetch("/api/complaints").then((r) => r.json()),
+          fetch("/api/notices").then((r) => r.json()),
+          fetch("/api/mess/menu").then((r) => r.json()),
+          fetch("/api/marketplace").then((r) => r.json()),
+          fetch("/api/inventory").then((r) => r.json()),
+          fetch("/api/students/requests/all").then((r) => r.json()),
+          fetch("/api/students/receipts/all").then((r) => r.json()),
+        ]);
+
+        setData((prev) => {
+          const updated = { ...prev };
+          if (hostelsRes.status === "fulfilled" && hostelsRes.value?.data?.length) updated.hostels = hostelsRes.value.data;
+          if (roomsRes.status === "fulfilled" && roomsRes.value?.data?.length) updated.rooms = roomsRes.value.data;
+          if (studentsRes.status === "fulfilled" && studentsRes.value?.data?.length) updated.students = studentsRes.value.data;
+          if (outpassesRes.status === "fulfilled" && outpassesRes.value?.data) updated.outpasses = outpassesRes.value.data;
+          if (complaintsRes.status === "fulfilled" && complaintsRes.value?.data) updated.complaints = complaintsRes.value.data;
+          if (noticesRes.status === "fulfilled" && noticesRes.value?.data) updated.notices = noticesRes.value.data;
+          if (messMenuRes.status === "fulfilled" && messMenuRes.value?.data) updated.messMenu = messMenuRes.value.data;
+          if (marketplaceRes.status === "fulfilled" && marketplaceRes.value?.data) updated.marketplace = marketplaceRes.value.data;
+          if (inventoryRes.status === "fulfilled" && inventoryRes.value?.data) updated.inventoryChecklist = inventoryRes.value.data;
+          if (requestsRes.status === "fulfilled" && requestsRes.value?.data) updated.requests = requestsRes.value.data;
+          if (receiptsRes.status === "fulfilled" && receiptsRes.value?.data) updated.receipts = receiptsRes.value.data;
+          return updated;
+        });
+      } catch (e) {
+        console.warn("Could not fetch initial data from backend, using local state:", e);
+      }
+    }
+
+    fetchBackendData();
+  }, []);
+
+  // Backend API Sync Helper
+  async function apiCall(endpoint, method = "GET", body = null) {
+    try {
+      const opts = { method, headers: {} };
+      if (body) {
+        opts.headers["Content-Type"] = "application/json";
+        opts.body = JSON.stringify(body);
+      }
+      const token = sessionStorage.getItem("pcte_token");
+      if (token) {
+        opts.headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch(endpoint, opts);
+      return await res.json();
+    } catch (e) {
+      console.warn(`API call ${method} ${endpoint} failed:`, e.message);
+    }
+  }
+
   // Outpass Handlers
   function applyOutpass(outpassData) {
     const newOutpass = {
@@ -315,6 +386,7 @@ export function HostelDataProvider({ children }) {
       ...prev,
       outpasses: [newOutpass, ...prev.outpasses],
     }));
+    apiCall("/api/outpasses", "POST", newOutpass);
     return newOutpass;
   }
 
@@ -325,6 +397,7 @@ export function HostelDataProvider({ children }) {
         o.id === outpassId ? { ...o, status: decision, approvedBy: decision === "approved" ? approvedBy : null } : o
       ),
     }));
+    apiCall(`/api/outpasses/${outpassId}/resolve`, "PATCH", { decision, approvedBy });
   }
 
   function checkInOutpass(outpassId, status) {
@@ -332,6 +405,7 @@ export function HostelDataProvider({ children }) {
       ...prev,
       outpasses: prev.outpasses.map((o) => (o.id === outpassId ? { ...o, status } : o)),
     }));
+    apiCall(`/api/outpasses/${outpassId}/checkin`, "PATCH", { status });
   }
 
   // Complaint / Maintenance Handlers
@@ -347,6 +421,7 @@ export function HostelDataProvider({ children }) {
       ...prev,
       complaints: [newComplaint, ...prev.complaints],
     }));
+    apiCall("/api/complaints", "POST", newComplaint);
     return newComplaint;
   }
 
@@ -357,6 +432,7 @@ export function HostelDataProvider({ children }) {
         c.id === complaintId ? { ...c, technician: technicianName, status: "assigned" } : c
       ),
     }));
+    apiCall(`/api/complaints/${complaintId}/assign`, "PATCH", { technicianName });
   }
 
   function updateComplaintStatus(complaintId, newStatus) {
@@ -366,6 +442,7 @@ export function HostelDataProvider({ children }) {
         c.id === complaintId ? { ...c, status: newStatus, resolvedAt: newStatus === "resolved" ? new Date().toISOString() : c.resolvedAt } : c
       ),
     }));
+    apiCall(`/api/complaints/${complaintId}/status`, "PATCH", { status: newStatus });
   }
 
   // Notice Board Handlers
@@ -380,6 +457,7 @@ export function HostelDataProvider({ children }) {
       ...prev,
       notices: [newNotice, ...prev.notices],
     }));
+    apiCall("/api/notices", "POST", newNotice);
     return newNotice;
   }
 
@@ -388,6 +466,7 @@ export function HostelDataProvider({ children }) {
       ...prev,
       notices: prev.notices.filter((n) => n.id !== noticeId),
     }));
+    apiCall(`/api/notices/${noticeId}`, "DELETE");
   }
 
   // Mess & Meal Handlers
@@ -407,6 +486,7 @@ export function HostelDataProvider({ children }) {
         },
       };
     });
+    apiCall("/api/mess/skips/toggle", "POST", { collegeId, mealKey });
   }
 
   // Attendance Handlers
@@ -421,6 +501,7 @@ export function HostelDataProvider({ children }) {
         },
       },
     }));
+    apiCall("/api/attendance/mark", "POST", { date: dateKey, collegeId, status });
   }
 
   function bulkMarkAttendance(dateKey, statusMap) {
@@ -434,6 +515,7 @@ export function HostelDataProvider({ children }) {
         },
       },
     }));
+    apiCall("/api/attendance/bulk", "POST", { date: dateKey, statusMap });
   }
 
   // Marketplace Handlers
@@ -446,6 +528,7 @@ export function HostelDataProvider({ children }) {
       ...prev,
       marketplace: [newItem, ...prev.marketplace],
     }));
+    apiCall("/api/marketplace", "POST", newItem);
     return newItem;
   }
 
@@ -457,6 +540,7 @@ export function HostelDataProvider({ children }) {
         item.id === itemId ? { ...item, verified } : item
       ),
     }));
+    apiCall(`/api/inventory/${itemId}/verify`, "PATCH", { verified });
   }
 
   // Room Allotment / Student Handlers (Existing)
@@ -468,6 +552,7 @@ export function HostelDataProvider({ children }) {
         [collegeId]: { ...prefs, submitted: true },
       },
     }));
+    apiCall(`/api/students/${collegeId}/preferences`, "POST", prefs);
   }
 
   function payFee(collegeId, details = {}) {
@@ -481,14 +566,95 @@ export function HostelDataProvider({ children }) {
       paymentMethod: details.method || "UPI",
     };
 
-    setData((prev) => ({
-      ...prev,
-      students: prev.students.map((s) =>
-        s.collegeId.toLowerCase() === collegeId.toLowerCase() ? { ...s, feeStatus: "paid" } : s
-      ),
-      receipts: [receipt, ...prev.receipts],
-    }));
+    setData((prev) => {
+      let allottedRoomName = null;
+      let allottedBlock = null;
+      let allottedType = null;
 
+      const targetStudent = prev.students.find(
+        (s) => s.collegeId?.toLowerCase() === collegeId?.toLowerCase()
+      );
+
+      const needsRoom =
+        !targetStudent ||
+        !targetStudent.room ||
+        targetStudent.room === "Unassigned" ||
+        targetStudent.status !== "allotted";
+
+      let nextRooms = [...prev.rooms];
+      if (needsRoom) {
+        // Preferred block check
+        const prefBlock = targetStudent?.block;
+        let roomIdx = -1;
+        if (prefBlock && prefBlock !== "Not Allotted" && prefBlock !== "Pending Allotment") {
+          roomIdx = nextRooms.findIndex(
+            (rm) => rm.block === prefBlock && !rm.maintenance && rm.occupied < rm.capacity
+          );
+        }
+        if (roomIdx < 0) {
+          roomIdx = nextRooms.findIndex(
+            (rm) => !rm.maintenance && rm.occupied < rm.capacity
+          );
+        }
+
+        if (roomIdx >= 0) {
+          const rm = nextRooms[roomIdx];
+          const studentName = targetStudent?.name || "Student Resident";
+          const newOccupants = rm.students.includes(studentName)
+            ? rm.students
+            : [...rm.students, studentName];
+
+          nextRooms[roomIdx] = {
+            ...rm,
+            students: newOccupants,
+            occupied: newOccupants.length,
+          };
+          allottedRoomName = rm.room;
+          allottedBlock = rm.block;
+          allottedType = rm.type;
+        }
+      }
+
+      const studentExists = prev.students.some(
+        (s) => s.collegeId?.toLowerCase() === collegeId?.toLowerCase()
+      );
+
+      const updatedStudents = studentExists
+        ? prev.students.map((s) => {
+            if (s.collegeId?.toLowerCase() === collegeId?.toLowerCase()) {
+              return {
+                ...s,
+                feeStatus: "paid",
+                room: allottedRoomName || s.room || "B-104",
+                block: allottedBlock || s.block || "Block B",
+                roomType: allottedType || s.roomType || "Single",
+                status: "allotted",
+              };
+            }
+            return s;
+          })
+        : [
+            ...prev.students,
+            {
+              collegeId,
+              name: targetStudent?.name || "Student Resident",
+              feeStatus: "paid",
+              room: allottedRoomName || "B-104",
+              block: allottedBlock || "Block B",
+              roomType: allottedType || "Single",
+              status: "allotted",
+            },
+          ];
+
+      return {
+        ...prev,
+        rooms: nextRooms,
+        students: updatedStudents,
+        receipts: [receipt, ...prev.receipts],
+      };
+    });
+
+    apiCall(`/api/students/${collegeId}/pay`, "POST", details);
     return receipt;
   }
 
@@ -508,10 +674,12 @@ export function HostelDataProvider({ children }) {
       requests: [newRequest, ...prev.requests],
     }));
 
+    apiCall("/api/students/requests", "POST", { studentName, collegeId, fromRoom, toRoom, reason });
     return newRequest;
   }
 
   function resolveRequest(requestIdOrIndex, decision) {
+    let targetReqId;
     setData((prev) => {
       let targetReq;
       if (typeof requestIdOrIndex === "number") {
@@ -521,6 +689,7 @@ export function HostelDataProvider({ children }) {
       }
 
       if (!targetReq) return prev;
+      targetReqId = targetReq.id;
 
       const updatedRequests = prev.requests.map((r) =>
         (r.id === targetReq.id || r === targetReq) ? { ...r, status: decision } : r
@@ -573,6 +742,10 @@ export function HostelDataProvider({ children }) {
         rooms: updatedRooms,
       };
     });
+
+    if (targetReqId) {
+      apiCall(`/api/students/requests/${targetReqId}/resolve`, "PATCH", { decision });
+    }
   }
 
   function runAllotment() {
@@ -609,6 +782,8 @@ export function HostelDataProvider({ children }) {
         rooms: nextRooms,
       };
     });
+
+    apiCall("/api/rooms/allotment/run", "POST");
     return count;
   }
 
@@ -623,6 +798,7 @@ export function HostelDataProvider({ children }) {
         return s;
       }),
     }));
+    apiCall(`/api/students/${collegeId}/fee-status`, "PATCH");
   }
 
   function addStudent(studentData) {
@@ -646,6 +822,7 @@ export function HostelDataProvider({ children }) {
         rooms: nextRooms,
       };
     });
+    apiCall("/api/students", "POST", studentData);
   }
 
   function addHostelBlock({ name, totalRooms = 15 }) {
@@ -667,6 +844,7 @@ export function HostelDataProvider({ children }) {
         rooms: [...prev.rooms, ...newRooms],
       };
     });
+    apiCall("/api/hostels", "POST", { name, totalRooms });
   }
 
   function flagMaintenance(roomNumber, isMaintenance = true) {
@@ -676,6 +854,7 @@ export function HostelDataProvider({ children }) {
         rm.room.toLowerCase() === roomNumber.toLowerCase() ? { ...rm, maintenance: isMaintenance } : rm
       ),
     }));
+    apiCall(`/api/rooms/${roomNumber}/maintenance`, "PATCH", { isMaintenance });
   }
 
   return (

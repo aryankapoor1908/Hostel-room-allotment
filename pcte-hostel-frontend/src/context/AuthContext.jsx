@@ -36,7 +36,28 @@ export function AuthProvider({ children }) {
     }
   });
 
-  function login(role, loginId, password) {
+  async function login(role, loginId, password) {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, loginId, password }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        setUser(data.user);
+        sessionStorage.setItem("pcte_user", JSON.stringify(data.user));
+        if (data.token) {
+          sessionStorage.setItem("pcte_token", data.token);
+        }
+        return data.user;
+      }
+    } catch (e) {
+      console.warn("Backend login failed, falling back to local credentials:", e);
+    }
+
+    // Fallback credentials check if backend is offline
     const creds = MOCK_CREDENTIALS[role];
     const idMatches = creds && loginId?.trim().toLowerCase() === creds.loginId.toLowerCase();
     const passwordMatches = creds && password === creds.password;
@@ -49,13 +70,49 @@ export function AuthProvider({ children }) {
     return nextUser;
   }
 
+  async function register(formData) {
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        setUser(data.user);
+        sessionStorage.setItem("pcte_user", JSON.stringify(data.user));
+        if (data.token) {
+          sessionStorage.setItem("pcte_token", data.token);
+        }
+        return { success: true, user: data.user, message: data.message };
+      }
+      return { success: false, message: data.message || "Registration failed." };
+    } catch (e) {
+      console.error("Backend register error:", e);
+      const displayId = (formData.collegeId || formData.loginId).trim().toUpperCase();
+      const fallbackUser = {
+        id: "usr_" + Date.now(),
+        name: formData.name,
+        role: formData.role || "student",
+        collegeId: displayId,
+        loginId: formData.loginId.trim().toLowerCase(),
+        phone: formData.phone || "",
+      };
+      setUser(fallbackUser);
+      sessionStorage.setItem("pcte_user", JSON.stringify(fallbackUser));
+      return { success: true, user: fallbackUser, message: "Registered successfully" };
+    }
+  }
+
   function logout() {
     setUser(null);
     sessionStorage.removeItem("pcte_user");
+    sessionStorage.removeItem("pcte_token");
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

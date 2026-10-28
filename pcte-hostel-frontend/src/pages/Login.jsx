@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import pcteLogo from "../assets/pcte-logo.svg";
@@ -28,9 +28,9 @@ export default function Login() {
     setError("");
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const user = login(role, id, password);
+    const user = await login(role, id, password);
     if (!user) {
       setError("Incorrect ID or password. Check the demo credentials below.");
       return;
@@ -93,11 +93,20 @@ export default function Login() {
             </div>
 
             <div className="pt-3">
-              <button type="submit" className="w-full bg-ink text-white py-3 rounded text-sm font-medium hover:bg-inkdeep transition-colors">
+              <button type="submit" className="w-full bg-ink text-white py-3 rounded text-sm font-medium hover:bg-inkdeep transition-colors cursor-pointer">
                 Sign in as {role}
               </button>
             </div>
           </form>
+
+          <div className="mt-5 pt-4 border-t border-line/60 text-center">
+            <p className="text-xs text-muted">
+              Don't have an allotment account?{" "}
+              <Link to="/signup" className="text-brand font-semibold hover:underline">
+                Create an account
+              </Link>
+            </p>
+          </div>
         </div>
 
         <div className="text-xs text-muted text-center mt-5 space-y-1">

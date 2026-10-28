@@ -129,17 +129,41 @@ export default function StudentDashboard() {
   } = useHostelData();
 
   // Current logged in student
-  const currentStudent = students.find(
+  const isDemoAryan =
+    user?.collegeId?.toLowerCase() === "bca0140" ||
+    (!user?.collegeId && user?.name?.toLowerCase().includes("aryan"));
+
+  const foundStudent = students.find(
     (s) => s.collegeId?.toLowerCase() === user?.collegeId?.toLowerCase()
-  ) || {
-    name: user?.name || "Aryan Kapoor",
-    collegeId: user?.collegeId || "BCA0140",
-    block: "Block B",
-    room: "B-214",
-    roomType: "Double",
-    feeStatus: "unpaid",
-    status: "allotted",
-  };
+  );
+
+  const currentStudent =
+    foundStudent ||
+    (isDemoAryan
+      ? {
+          name: "Aryan Kapoor",
+          collegeId: "BCA0140",
+          block: "Block B",
+          room: "B-214",
+          roomType: "Double",
+          feeStatus: "unpaid",
+          status: "allotted",
+        }
+      : {
+          name: user?.name || "Student Resident",
+          collegeId: user?.collegeId || "",
+          block: "Pending Allotment",
+          room: "Unassigned",
+          roomType: "Pending Allotment",
+          feeStatus: "unpaid",
+          status: "pending",
+        });
+
+  const isAllotted =
+    currentStudent.feeStatus === "paid" &&
+    Boolean(currentStudent.room) &&
+    currentStudent.room !== "Unassigned" &&
+    currentStudent.status === "allotted";
 
   const savedPref = studentPreferences[user?.collegeId] || {
     hostelBlock: currentStudent.block || "Block B",
@@ -285,15 +309,24 @@ export default function StudentDashboard() {
                   Official hostel residence record for Academic Session 2026–27.
                 </p>
                 <div className="bg-white border border-line rounded p-5 space-y-3 max-w-md shadow-xs">
-                  <Row label="Registration ID" value={currentStudent.collegeId} />
-                  <Row label="Hostel Block" value={currentStudent.block} />
-                  <Row label="Room Number" value={currentStudent.room} isMono />
+                  <Row label="Registration ID" value={currentStudent.collegeId || user?.collegeId} />
+                  <Row
+                    label="Hostel Block"
+                    value={isAllotted ? currentStudent.block : "Pending Payment & Allotment"}
+                  />
+                  <Row
+                    label="Room Number"
+                    value={isAllotted ? currentStudent.room : "Unassigned (Payment Required)"}
+                    isMono={isAllotted}
+                  />
                   <Row
                     label="Room Type"
                     value={
-                      currentStudent.roomType.includes("sharing")
-                        ? currentStudent.roomType
-                        : `${currentStudent.roomType} sharing`
+                      isAllotted
+                        ? currentStudent.roomType.includes("sharing")
+                          ? currentStudent.roomType
+                          : `${currentStudent.roomType} sharing`
+                        : "Pending Allotment"
                     }
                   />
                   <div className="flex items-center justify-between text-sm pt-1 border-t border-line">
@@ -307,7 +340,7 @@ export default function StudentDashboard() {
                           : "bg-rejected/10 text-rejected"
                       }`}
                     >
-                      {currentStudent.feeStatus === "paid" ? "Paid / Confirmed" : currentStudent.feeStatus}
+                      {currentStudent.feeStatus === "paid" ? "Paid / Confirmed" : "Unpaid (Action Required)"}
                     </span>
                   </div>
                 </div>
@@ -316,41 +349,73 @@ export default function StudentDashboard() {
               {/* Action Buttons */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-w-md">
                 <button
-                  onClick={() => setShowLetterModal(true)}
-                  className="flex items-center justify-center gap-1.5 bg-ink text-white px-3 py-2.5 rounded text-xs font-medium hover:bg-inkdeep transition-colors shadow-xs"
+                  onClick={() => {
+                    if (!isAllotted) {
+                      setShowPaymentModal(true);
+                    } else {
+                      setShowLetterModal(true);
+                    }
+                  }}
+                  className="flex items-center justify-center gap-1.5 bg-ink text-white px-3 py-2.5 rounded text-xs font-medium hover:bg-inkdeep transition-colors shadow-xs cursor-pointer"
                 >
-                  <FileText size={14} /> Allotment Slip
+                  <FileText size={14} /> {isAllotted ? "Allotment Slip" : "Pay to Allot"}
                 </button>
 
                 <button
-                  onClick={() => setShowInventoryModal(true)}
-                  className="flex items-center justify-center gap-1.5 border border-line bg-white text-slate px-3 py-2.5 rounded text-xs font-medium hover:bg-paper transition-colors shadow-xs"
+                  onClick={() => {
+                    if (!isAllotted) {
+                      alert("Room fixtures checklist will be unlocked once your room allotment is confirmed upon fee payment.");
+                    } else {
+                      setShowInventoryModal(true);
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 border border-line bg-white text-slate px-3 py-2.5 rounded text-xs font-medium transition-colors shadow-xs ${
+                    !isAllotted ? "opacity-60 cursor-not-allowed" : "hover:bg-paper cursor-pointer"
+                  }`}
                 >
                   <ClipboardCheck size={14} className="text-brass" /> Room Fixtures
                 </button>
 
                 <button
-                  onClick={() => setShowChangeModal(true)}
-                  className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 border border-line bg-white text-slate px-3 py-2.5 rounded text-xs font-medium hover:bg-paper transition-colors shadow-xs"
+                  onClick={() => {
+                    if (!isAllotted) {
+                      alert("Room change requests can be submitted once an initial room is allotted upon fee payment.");
+                    } else {
+                      setShowChangeModal(true);
+                    }
+                  }}
+                  className={`col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 border border-line bg-white text-slate px-3 py-2.5 rounded text-xs font-medium transition-colors shadow-xs ${
+                    !isAllotted ? "opacity-60 cursor-not-allowed" : "hover:bg-paper cursor-pointer"
+                  }`}
                 >
                   <ArrowRightLeft size={14} className="text-brass" /> Request Change
                 </button>
               </div>
 
-              {currentStudent.feeStatus !== "paid" && (
-                <div className="bg-brass/10 border border-brass/30 rounded p-4 max-w-md flex items-start gap-3">
-                  <CreditCard size={18} className="text-brass mt-0.5 shrink-0" />
-                  <div className="text-xs text-slate">
-                    <p className="font-semibold text-ink">Hostel 1st Installment Due</p>
-                    <p className="mt-0.5 text-muted">
-                      Your room is provisionally reserved. Clear your 1st installment to finalize check-in.
+              {!isAllotted ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 max-w-md flex items-start gap-3 shadow-xs">
+                  <CreditCard size={18} className="text-amber-700 mt-0.5 shrink-0" />
+                  <div className="text-xs text-amber-900">
+                    <p className="font-semibold text-amber-950">Room Allotment Pending Fee Payment</p>
+                    <p className="mt-0.5 text-amber-800 leading-relaxed">
+                      No room is allotted yet. Rooms are officially confirmed and allotted strictly upon fee payment. Clear your 1st installment (₹60,000) online to secure and allot your room now.
                     </p>
                     <button
                       onClick={() => setShowPaymentModal(true)}
-                      className="mt-2 text-xs font-semibold text-brass hover:underline inline-flex items-center gap-1"
+                      className="mt-2.5 bg-ink text-white px-3.5 py-1.5 rounded text-xs font-semibold hover:bg-slate transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                     >
-                      Pay ₹60,000 online now →
+                      Pay ₹60,000 online to allot room →
                     </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-confirmed/10 border border-confirmed/30 rounded-lg p-4 max-w-md flex items-start gap-3">
+                  <CheckCircle2 size={18} className="text-confirmed mt-0.5 shrink-0" />
+                  <div className="text-xs text-slate">
+                    <p className="font-semibold text-confirmed">Room Allotment Active & Confirmed</p>
+                    <p className="mt-0.5 text-muted">
+                      Your fee payment is verified. You are officially allotted to Room {currentStudent.room} in {currentStudent.block}.
+                    </p>
                   </div>
                 </div>
               )}
@@ -358,9 +423,9 @@ export default function StudentDashboard() {
 
             <div>
               <RoomKeyTag
-                status={currentStudent.status || "allotted"}
-                hostelBlock={currentStudent.block}
-                roomNumber={currentStudent.room}
+                status={isAllotted ? "allotted" : "pending"}
+                hostelBlock={isAllotted ? currentStudent.block : "Pending Allotment"}
+                roomNumber={isAllotted ? currentStudent.room : "—"}
                 roomType={
                   currentStudent.roomType.includes("sharing")
                     ? currentStudent.roomType

@@ -8,12 +8,20 @@ export default function AuthNavAction() {
 
   if (!user) {
     return (
-      <Link
-        to="/login"
-        className="text-sm font-semibold text-white bg-navy hover:bg-navyDeep px-4 py-2 rounded-lg transition-colors shadow-sm"
-      >
-        Sign in
-      </Link>
+      <div className="flex items-center gap-2">
+        <Link
+          to="/login"
+          className="text-xs sm:text-sm font-medium text-slate hover:text-ink px-3 py-1.5 rounded-lg hover:bg-paper transition-colors"
+        >
+          Sign in
+        </Link>
+        <Link
+          to="/signup"
+          className="text-xs sm:text-sm font-semibold text-white bg-navy hover:bg-navyDeep px-3.5 py-1.5 rounded-lg transition-colors shadow-sm"
+        >
+          Register
+        </Link>
+      </div>
     );
   }
 

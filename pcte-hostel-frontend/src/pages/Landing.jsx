@@ -96,10 +96,16 @@ export default function Landing() {
 
             <div className="flex flex-wrap items-center gap-3 mt-8">
               <Link
+                to="/signup"
+                className="inline-flex items-center gap-2 bg-brand text-white hover:bg-brandHov px-5 py-2.5 rounded-lg font-semibold text-sm transition-all shadow-sm"
+              >
+                Register for Hostel <ArrowRight size={15} />
+              </Link>
+              <Link
                 to="/login"
                 className="inline-flex items-center gap-2 bg-white text-ink hover:bg-white/90 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all shadow-sm"
               >
-                Access Portal <ArrowRight size={15} />
+                Sign In
               </Link>
               <Link
                 to="/hostel-facilities"
